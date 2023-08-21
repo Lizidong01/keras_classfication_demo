@@ -1,0 +1,3 @@
+# keras_classfication_demo
+
+一个使用keras进行文本分类的小demo
