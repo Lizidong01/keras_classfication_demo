@@ -1,64 +1,62 @@
 import tensorflow as tf
-from tensorflow.keras import layers
+from tensorflow.keras import layers, models
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.keras import regularizers
-from keras.models import load_model
 import numpy as np
-class ClassficationModel():
-    def __init__(self):
-        self.model = None
 
-    def __build_model(self, num_features):
-        model = tf.keras.Sequential([
-            layers.GaussianNoise(0.15),
-            layers.Dense(128, input_dim=num_features, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
-            layers.BatchNormalization(),
-            layers.Dropout(0.6),
-            layers.Dense(32, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
-            layers.BatchNormalization(),
-            layers.Dropout(0.6),
-            layers.Dense(32, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
-            layers.BatchNormalization(),
-            layers.Dropout(0.6),
-            layers.Dense(4)
-        ])
+class ClassificationModel:
+    def __init__(self, num_classes, optimizer=tf.keras.optimizers.Adam, learning_rate=0.01,
+                 hidden_units=(128, 32, 32), dropout_rates=(0.6, 0.6, 0.6),
+                 l2_regularizer=0.01):
+        self.num_classes = num_classes
+        self.optimizer = optimizer
+        self.learning_rate = learning_rate
+        self.hidden_units = hidden_units
+        self.dropout_rates = dropout_rates
+        self.l2_regularizer = l2_regularizer
+
+        self.model = self.build_model()
+
+    def build_model(self):
+        model = models.Sequential()
+
+        model.add(layers.GaussianNoise(0.15))
+
+        for units, dropout_rate in zip(self.hidden_units, self.dropout_rates):
+            model.add(layers.Dense(units, activation='relu',
+                                   kernel_regularizer=tf.keras.regularizers.l2(self.l2_regularizer)))
+            model.add(layers.BatchNormalization())
+            model.add(layers.Dropout(dropout_rate))
+
+        model.add(layers.Dense(self.num_classes))
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(lr=0.01),
+            optimizer=self.optimizer(learning_rate=self.learning_rate),
             loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
             metrics=['accuracy'],
         )
+
         return model
-    
-    def model_fit(self, X_train, y_train):
-        self.model = self.__build_model(X_train.shape[1])
-        early_stopping = EarlyStopping(monitor='val_loss', patience=20)
-        model_checkpoint = ModelCheckpoint('best_model.h5', monitor='val_loss', save_best_only=True)
 
-        def scheduler(epoch, lr):
-            return lr * 0.98
+    def fit(self, X_train, y_train, batch_size=32, epochs=500, validation_split=0.3, callbacks=None):
+        if callbacks is None:
+            callbacks = [EarlyStopping(monitor='val_loss', patience=20),
+                         ModelCheckpoint('best_model.h5', monitor='val_loss', save_best_only=True)]
 
-        learning_rate_scheduler = tf.keras.callbacks.LearningRateScheduler(scheduler)
+        self.model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs,
+                       validation_split=validation_split, callbacks=callbacks)
 
-        callbacks = [early_stopping, model_checkpoint, learning_rate_scheduler]
-
-        self.model.fit(
-            X_train
-            , y_train
-            , batch_size=32
-            , epochs=500
-            , validation_split=0.3
-            , callbacks=callbacks
-        )
     def evaluate(self, X_test, y_test):
-        self.model = load_model('best_model.h5')
+        self.model = models.load_model('best_model.h5')
         loss, accuracy = self.model.evaluate(X_test, y_test)
         print(f"Test set accuracy: {accuracy}")
         return accuracy
-    
+
     def predict(self, X_test):
-        self.model = load_model('best_model.h5')
+        self.model = models.load_model('best_model.h5')
         predictions = self.model.predict(X_test)
         predictions = np.argmax(predictions, axis=1)
         return predictions
-    
+
+    def save_model(self, model_name):
+        # self.model.save(model_name)
+        self.model.save(model_name + ".h5")
