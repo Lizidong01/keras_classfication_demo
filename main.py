@@ -7,4 +7,5 @@ if __name__ == "__main__":
     model = ClassficationModel()
     model.model_fit(X_train, y_train)
     model.evaluate(X_test, y_test)
+    model.predict(X_test)
 

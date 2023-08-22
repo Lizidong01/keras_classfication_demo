@@ -1,12 +1,9 @@
-from data_process import read_data
-
 import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras import regularizers
-
-
+from keras.models import load_model
+import numpy as np
 class ClassficationModel():
     def __init__(self):
         self.model = None
@@ -54,7 +51,14 @@ class ClassficationModel():
             , callbacks=callbacks
         )
     def evaluate(self, X_test, y_test):
-        self.model.load_weights('best_model.h5')
+        self.model = load_model('best_model.h5')
         loss, accuracy = self.model.evaluate(X_test, y_test)
         print(f"Test set accuracy: {accuracy}")
         return accuracy
+    
+    def predict(self, X_test):
+        self.model = load_model('best_model.h5')
+        predictions = self.model.predict(X_test)
+        predictions = np.argmax(predictions, axis=1)
+        return predictions
+    
